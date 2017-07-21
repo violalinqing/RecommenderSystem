@@ -29,16 +29,11 @@ class SVDPP(object):
         self.max_rating = 0.0
 
         # 读取dataset
-        line_count = 0
-        user_rating = dict()
-        rating_all = 0.0
+        self.line_count = 0
+        self.user_rating = dict()
+        self.rating_all = 0.0
         for line in dataset:
-            fields = line.split(",")
-
-            if line_count == 0:
-                line_count += 1
-                continue
-
+            fields = line.split("\t")
             if fields[0] not in self.user_id:
                 self.user_id.setdefault(fields[0], self.user_num)
                 self.user_num += 1
@@ -47,19 +42,19 @@ class SVDPP(object):
                 self.item_id.setdefault(fields[1], self.item_num)
                 self.item_num += 1
 
-            user_rating.setdefault(fields[0], {})
-            user_rating[fields[0]][fields[1]] = float(fields[2])
-            rating_all += float(fields[2])
+            self.user_rating.setdefault(fields[0], {})
+            self.user_rating[fields[0]][fields[1]] = float(fields[2])
+            self.rating_all += float(fields[2])
 
             if float(fields[2]) > self.max_rating:
                 self.max_rating = float(fields[2])
             if float(fields[2]) < self.min_rating:
                 self.min_rating = float(fields[2])
-            line_count += 1
+            self.line_count += 1
 
         self.rating_matrix = dict()
 
-        self.movie_ranting_mean = rating_all / line_count
+        self.movie_ranting_mean = self.rating_all / self.line_count
         #初始化
         self.bu = np.zeros((self.user_num, 1), dtype=np.double)
         self.bi = np.zeros(self.item_num, np.double)
@@ -68,9 +63,9 @@ class SVDPP(object):
         self.y = np.zeros((self.item_num, self.n_factors), np.double) + .1
 
         #建立rating表
-        for user in user_rating.keys():
+        for user in self.user_rating.keys():
             user_index = self.user_id[user]
-            for item, rating in user_rating[user].items():
+            for item, rating in self.user_rating[user].items():
                 item_index = self.item_id[item]
                 self.rating_matrix.setdefault(user_index, {})
                 self.rating_matrix[user_index][item_index] = rating
@@ -78,11 +73,10 @@ class SVDPP(object):
     def train(self):
         rmse = 0.0
         for current_epoch in range(self.n_epochs):
-            rmse_iter = 0
+            self.rmse_iter = 0
             last_rmse = 1000000
             # 遍历所有user
             for u in self.rating_matrix:
-
                 I_Nu = len(self.rating_matrix[u])
                 sqrt_N_u = np.sqrt(I_Nu)
                 y_u = 0
@@ -114,18 +108,53 @@ class SVDPP(object):
                         self.y[j] += self.alpha * (e_ui * self.q[j] / sqrt_N_u - self.lamda * self.y[j])
 
                     rmse += e_ui * e_ui
-                    rmse_iter +=1
+                    self.rmse_iter +=1
 
             #均方根误差
-            rmse = np.sqrt(rmse / rmse_iter)
-            print (" item num:",current_epoch," rmse :", rmse)
+            rmse = np.sqrt(rmse / self.rmse_iter)
+            print (" iter num:",current_epoch," rmse :", rmse)
 
             if rmse > last_rmse:
                 break
             last_rmse = rmse
             self.alpha *= 0.9
 
+    def test(self,dataset):
+        rmse = 0.0
+        self.rmse_iter = 0
+        for line in dataset:
+            fields = line.split("\t")
+            u = int(fields[0])-1
+            i = int(fields[1])-1
+            I_Nu = len(self.rating_matrix[u])
+            sqrt_N_u = np.sqrt(I_Nu)
+            y_u = 0
+
+            # 基于用户u点评的item集推测u的implicit偏好
+            for k in range(0, self.n_factors):
+                y_u += self.y[u][k]
+
+            u_impl_prf = y_u / sqrt_N_u
+
+            rp = self.movie_ranting_mean + self.bu[u] + self.bi[i] + np.dot(self.q[i], self.p[u] + u_impl_prf)
+
+            e_ui = float(fields[2]) - rp
+
+            rmse += e_ui * e_ui
+            self.rmse_iter += 1
+
+            # 均方根误差
+        rmse = np.sqrt(rmse / self.rmse_iter)
+        print(" test rmse :", rmse)
+
+
+
+
 if __name__ == '__main__':
-    dataset = loadfile("ratings.csv")
-    svd = SVDPP(dataset, 10, 10,0.001,0.001)
+    dataset_train = loadfile("u1.base")
+
+    svd = SVDPP(dataset_train, 10, 10,0.001,0.001)
     svd.train()
+
+    dataset_test = loadfile("u1.test")
+    svd.test(dataset_test)
