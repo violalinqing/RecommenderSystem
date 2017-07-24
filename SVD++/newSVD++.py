@@ -14,13 +14,14 @@ def loadfile(file_name):
 
 
 class SVDPP(object):
-    def __init__(self, dataset, n_factors, n_epochs, alpha, lamda):
+    def __init__(self, dataset, n_factors, n_epochs, alpha, lamda, dataset_test):
         self.n_factors = n_factors
         self.n_epochs = n_epochs
         self.user_id = dict()
         self.item_id = dict()
         self.alpha = alpha
         self.lamda = lamda
+        self.dataset_test = dataset_test
 
         self.user_num = 0
         self.item_num = 0
@@ -91,11 +92,6 @@ class SVDPP(object):
                     #print(u, "      ", i)
                     rp = self.movie_ranting_mean + self.bu[u] + self.bi[i] + np.dot(self.q[i], self.p[u] + u_impl_prf)
 
-                    if rp > self.max_rating:
-                        rp = self.max_rating
-                    if rp < self.min_rating:
-                        rp = self.min_rating
-
                     e_ui = self.rating_matrix[u][i] - rp
 
                     self.bu[u] += self.alpha * (e_ui - (self.lamda * self.bu[u]))
@@ -119,9 +115,20 @@ class SVDPP(object):
             last_rmse = rmse
             self.alpha *= 0.9
 
+            self.test(self.dataset_test)
+
     def test(self,dataset):
+
+        rating_all = 0.0
+        line_count = 0
+        rmse_iter = 0
         rmse = 0.0
-        self.rmse_iter = 0
+        for line in dataset:
+            fields = line.split("\t")
+            rating_all += float(fields[2])
+            line_count += 1
+
+        movie_ranting_mean = rating_all / line_count
         for line in dataset:
             fields = line.split("\t")
             u = int(fields[0])-1
@@ -141,10 +148,10 @@ class SVDPP(object):
             e_ui = float(fields[2]) - rp
 
             rmse += e_ui * e_ui
-            self.rmse_iter += 1
+            rmse_iter += 1
 
             # 均方根误差
-        rmse = np.sqrt(rmse / self.rmse_iter)
+        rmse = np.sqrt(rmse / rmse_iter)
         print(" test rmse :", rmse)
 
 
@@ -152,9 +159,9 @@ class SVDPP(object):
 
 if __name__ == '__main__':
     dataset_train = loadfile("u1.base")
-
-    svd = SVDPP(dataset_train, 10, 10,0.001,0.001)
+    dataset_test = loadfile("u1.test")
+    svd = SVDPP(dataset_train, 10, 5,0.005,0.003,dataset_test)
     svd.train()
 
-    dataset_test = loadfile("u1.test")
+
     svd.test(dataset_test)
