@@ -110,8 +110,6 @@ class SVDPP(object):
             rmse = np.sqrt(rmse / self.rmse_iter)
             print (" iter num:",current_epoch," rmse :", rmse)
 
-            if rmse > last_rmse:
-                break
             last_rmse = rmse
             self.alpha *= 0.9
 
@@ -158,10 +156,8 @@ class SVDPP(object):
 
 
 if __name__ == '__main__':
-    dataset_train = loadfile("u1.base")
-    dataset_test = loadfile("u1.test")
-    svd = SVDPP(dataset_train, 10, 5,0.005,0.003,dataset_test)
+    dataset_train = loadfile("u2.base")
+    dataset_test = loadfile("u2.test")
+    svd = SVDPP(dataset_train, 100, 20, 0.001, 0.01, dataset_test)
     svd.train()
-
-
     svd.test(dataset_test)
