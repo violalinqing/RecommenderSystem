@@ -1,9 +1,17 @@
-
+#################################################
+# SVM: support vector machine
+# Author : zouxy
+# Date   : 2013-12-12
+# HomePage : http://blog.csdn.net/zouxy09
+# Email  : zouxy09@qq.com
+#################################################
 
 from numpy import *
 import time
 import matplotlib.pyplot as plt
 
+
+# calulate kernel value
 def calcKernelValue(matrix_x, sample_x, kernelOption):
     kernelType = kernelOption[0]
     numSamples = matrix_x.shape[0]
