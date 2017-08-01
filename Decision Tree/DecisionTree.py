@@ -243,6 +243,30 @@ def valid_example(example, node):
     else:
         return valid_example(example, node.lower_child)
 
+def post_prun_tree(node,root,validset,best_score):
+    if node.is_leaf == True:
+        node.parent.is_leaf = True
+        node.parent.classification = node.classification
+        if node.height < 20:
+            new_score = validTree(root,validset)
+        else:
+            new_score = 0
+        if new_score >= best_score:
+            return new_score
+        else:
+            node.parent.is_leaf = False
+            node.parent.classification = None
+            return best_score
+
+    else:
+        new_score = post_prun_tree(node.upper_child,root,validset,best_score)
+        if node.is_leaf == True:
+            return new_score
+        new_score = post_prun_tree(node.lower_child, root, validset, new_score)
+        if node.is_leaf == True:
+            return new_score
+        return new_score
+
 if __name__ == "__main__":
     dataset = data("")
     read_data(dataset,'btrain.csv')
@@ -252,11 +276,14 @@ if __name__ == "__main__":
 
     preprocess(dataset)
 
-    node = build_tree(dataset, None, classifier)
+    root = build_tree(dataset, None, classifier)
 
     validset = data(classifier)
     read_data(validset, 'bvalidate.csv')
     validset.class_index = range(len(validset.attributes))[-1]
     preprocess(validset)
-    best_score = validTree(node,validset)
-    print "pre-pruning accuracy :" + str(100*best_score)
+    best_score = validTree(root,validset)
+    print "pre-pruning accuracy: " + str(100*best_score)
+    best_score = post_prun_tree(root, root, validset, best_score)
+
+    print "post-pruning accuracy: " + str(100*best_score)
