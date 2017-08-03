@@ -1,42 +1,25 @@
-
-
 from numpy import *
-import time
-import matplotlib.pyplot as plt
 
 
 # calulate kernel value
-def calcKernelValue(matrix_x, sample_x, kernelOption):
-    kernelType = kernelOption[0]
-    numSamples = matrix_x.shape[0]
-    kernelValue = mat(zeros((numSamples, 1)))
+def calcKernelValue(matrix_x, sample_x):
+    kernelValue = matrix_x * sample_x.T
 
-    if kernelType == 'linear':
-        kernelValue = matrix_x * sample_x.T
-    elif kernelType == 'rbf':
-        sigma = kernelOption[1]
-        if sigma == 0:
-            sigma = 1.0
-        for i in xrange(numSamples):
-            diff = matrix_x[i, :] - sample_x
-            kernelValue[i] = exp(diff * diff.T / (-2.0 * sigma ** 2))
-    else:
-        raise NameError('Not support kernel type! You can use linear or rbf!')
     return kernelValue
 
 
 # calculate kernel matrix given train set and kernel type
-def calcKernelMatrix(train_x, kernelOption):
+def calcKernelMatrix(train_x):
     numSamples = train_x.shape[0]
     kernelMatrix = mat(zeros((numSamples, numSamples)))
     for i in xrange(numSamples):
-        kernelMatrix[:, i] = calcKernelValue(train_x, train_x[i, :], kernelOption)
+        kernelMatrix[:, i] = calcKernelValue(train_x, train_x[i, :])
     return kernelMatrix
 
 
 # define a struct just for storing variables and data
 class SVMStruct:
-    def __init__(self, dataSet, labels, C, toler, kernelOption):
+    def __init__(self, dataSet, labels, C, toler):
         self.train_x = dataSet  # each row stands for a sample
         self.train_y = labels  # corresponding label
         self.C = C  # slack variable
@@ -45,8 +28,7 @@ class SVMStruct:
         self.alphas = mat(zeros((self.numSamples, 1)))  # Lagrange factors for all samples
         self.b = 0
         self.errorCache = mat(zeros((self.numSamples, 2)))
-        self.kernelOpt = kernelOption
-        self.kernelMat = calcKernelMatrix(self.train_x, self.kernelOpt)
+        self.kernelMat = calcKernelMatrix(self.train_x)
 
 
 # calculate the error for alpha k
@@ -66,8 +48,8 @@ def updateError(svm, alpha_k):
 def selectAlpha_j(svm, alpha_i, error_i):
     svm.errorCache[alpha_i] = [1, error_i]  # mark as valid(has been optimized)
     candidateAlphaList = nonzero(svm.errorCache[:, 0].A)[0]  # mat.A return array
-    maxStep = 0;
-    alpha_j = 0;
+    maxStep = 0
+    alpha_j = 0
     error_j = 0
 
     # find the alpha with max iterative step
@@ -91,7 +73,7 @@ def selectAlpha_j(svm, alpha_i, error_i):
 
 
 # the inner loop for optimizing alpha i and alpha j
-def innerLoop(svm, alpha_i):
+def SMO(svm, alpha_i):
     error_i = calcError(svm, alpha_i)
 
     ### check and pick up the alpha who violates the KKT condition
@@ -163,8 +145,8 @@ def innerLoop(svm, alpha_i):
             svm.b = (b1 + b2) / 2.0
 
         # step 9: update error cache for alpha i, j after optimize alpha i, j and b
-        updateError(svm, alpha_j)
         updateError(svm, alpha_i)
+        updateError(svm, alpha_j)
 
         return 1
     else:
@@ -172,10 +154,9 @@ def innerLoop(svm, alpha_i):
 
 
 # the main training procedure
-def trainSVM(train_x, train_y, C, toler, maxIter, kernelOption=('rbf', 1.0)):
+def trainSVM(train_x, train_y, C, toler, maxIter):
     # init data struct for svm
-    svm = SVMStruct(mat(train_x), mat(train_y), C, toler, kernelOption)
-
+    svm = SVMStruct(mat(train_x), mat(train_y), C, toler)
     # start training
     entireSet = True
     alphaPairsChanged = 0
@@ -189,15 +170,17 @@ def trainSVM(train_x, train_y, C, toler, maxIter, kernelOption=('rbf', 1.0)):
 
         # update alphas over all training examples
         if entireSet:
-            for i in xrange(svm.numSamples):
-                alphaPairsChanged += innerLoop(svm, i)
+            for i in range(svm.numSamples):
+                alphaPairsChanged += SMO(svm, i)
             print '---iter:%d entire set, alpha pairs changed:%d' % (iterCount, alphaPairsChanged)
             iterCount += 1
         # update alphas over examples where alpha is not 0 & not C (not on boundary)
         else:
+
             nonBoundAlphasList = nonzero((svm.alphas.A > 0) * (svm.alphas.A < svm.C))[0]
+            print nonBoundAlphasList
             for i in nonBoundAlphasList:
-                alphaPairsChanged += innerLoop(svm, i)
+                alphaPairsChanged += SMO(svm, i)
             print '---iter:%d non boundary, alpha pairs changed:%d' % (iterCount, alphaPairsChanged)
             iterCount += 1
 
@@ -221,7 +204,7 @@ def testSVM(svm, test_x, test_y):
     supportVectorAlphas = svm.alphas[supportVectorsIndex]
     matchCount = 0
     for i in xrange(numTestSamples):
-        kernelValue = calcKernelValue(supportVectors, test_x[i, :], svm.kernelOpt)
+        kernelValue = calcKernelValue(supportVectors, test_x[i, :])
         predict = kernelValue.T * multiply(supportVectorLabels, supportVectorAlphas) + svm.b
         if sign(predict) == sign(test_y[i]):
             matchCount += 1
@@ -247,9 +230,10 @@ test_x = dataSet[80:101, :]
 test_y = labels[80:101, :]
 
 C = 0.6
-toler = 0.001
+toler = 0.0
 maxIter = 50
-svmClassifier = trainSVM(train_x, train_y, C, toler, maxIter, kernelOption=('linear', 0))
+
+svmClassifier = trainSVM(train_x, train_y, C, toler, maxIter)
 
 accuracy = testSVM(svmClassifier, test_x, test_y)
 
